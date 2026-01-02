@@ -3,6 +3,7 @@
 namespace Webkul\Halkode\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use Webkul\Checkout\Facades\Cart;
 use Webkul\Sales\Repositories\OrderRepository;
 use Webkul\Sales\Repositories\InvoiceRepository;
@@ -73,7 +74,7 @@ class PaymentController extends Controller
             "expiry_year"         => $request->expiry_year,
             "cvv"                 => $request->cvv,
             "currency_code"       => "TRY",
-            "installments_number" => 1,
+            "installments_number" => $request->installments_number,
             "invoice_id"          => $invoiceId,
             "invoice_description" => "Grand total:" . $cart->grand_total,
             "total"               => number_format($cart->grand_total, 2, '.', ''),
@@ -81,28 +82,26 @@ class PaymentController extends Controller
             "name"                => $cart['customer_first_name'],
             "surname"             => $cart['customer_last_name'],
             "merchant_key"        => env('HALKODE_MERCHANT_KEY'),
-            "hash_key"            => $this->generateHash(number_format($cart->grand_total, 2, '.', ''), 1, 'TRY', env('HALKODE_MERCHANT_KEY'), $invoiceId, env('HALKODE_APP_SECRET')),
+            "hash_key"            => $this->generateHash(number_format($cart->grand_total, 2, '.', ''), $request->installments_number, 'TRY', env('HALKODE_MERCHANT_KEY'), $invoiceId, env('HALKODE_APP_SECRET')),
             "return_url"          => route('halkode.success'),
             "cancel_url"          => route('halkode.cancel'),
         ];
 
-        $ch = curl_init(env('HALKODE_BASE_URL'));
-        curl_setopt($ch, CURLOPT_POST, 1);
-        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($payload));
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
+        $response = Http::withHeaders([
+            'Content-Type' => 'application/json',
+        ])
+            ->timeout(30)
+            ->post(env('HALKODE_BASE_URL'), $payload);
 
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
-
-        if ($httpCode !== 200 || !$response) {
-            echo json_encode(["error" => "API isteği başarısız. HTTP Kodu: $httpCode"]);
-            exit;
+        if ($response->failed()) {
+            return response()->json([
+                'error'   => 'Halkode API request failed',
+                'status'  => $response->status(),
+                'message' => $response->body(),
+            ], $response->status());
         }
 
-        echo $response;
+        return $response->body();
     }
 
     /**
