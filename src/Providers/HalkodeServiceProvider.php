@@ -24,6 +24,8 @@ class HalkodeServiceProvider extends ServiceProvider
         $this->loadTranslationsFrom(__DIR__.'/../Resources/lang', 'halkode');
 
         $this->loadViewsFrom(__DIR__.'/../Resources/views', 'halkode');
+
+        $this->publishes([__DIR__ . '/../Resources/assets' => public_path('vendor/halkode')], 'halkode-assets');
     }
 
     /**

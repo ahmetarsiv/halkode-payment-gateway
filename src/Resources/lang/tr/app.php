@@ -18,5 +18,27 @@ return [
 
     'resources' => [
         'title'             => 'Ödeme',
+
+        'security' => [
+            'ssl'           => '256-bit SSL Güvenli Ödeme',
+        ],
+
+        'actions' => [
+            'back_to_cart'  => 'Sepete geri dön',
+            'pay'           => 'Öde',
+        ],
+
+        'form' => [
+            'card_holder_name'                  => 'Ad Soyad',
+            'card_holder_name_placeholder'      => 'Kart Sahibi Ad Soyad',
+            'card_number'                       => 'Kart Numarası',
+            'expiry_month'                      => 'Ay',
+            'expiry_month_placeholder'          => 'AA',
+            'expiry_year'                       => 'Yıl',
+            'expiry_year_placeholder'           => 'YY',
+            'cvv'                               => 'CVV',
+            'installment'                       => 'Taksit',
+            'single_payment'                    => 'Tek Çekim / Taksit Seçiniz',
+        ],
     ],
 ];
