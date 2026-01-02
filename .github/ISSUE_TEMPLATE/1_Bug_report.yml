@@ -6,8 +6,8 @@ body:
       value: "Please read [our full contribution guide](https://devdocs.bagisto.com/) before submitting bug reports. If you notice improper DocBlock, PHPStan, or IDE warnings while using Laravel, do not create a GitHub issue. Instead, please submit a pull request to fix the problem."
   - type: input
     attributes:
-      label: Param POS Payment Version
-      description: Provide the Param POS Payment version that you are using.
+      label: Halk Öde Payment Version
+      description: Provide the Halk Öde Payment version that you are using.
       placeholder: Version
     validations:
       required: true
