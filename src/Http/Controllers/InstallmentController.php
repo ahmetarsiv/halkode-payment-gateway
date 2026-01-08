@@ -15,6 +15,7 @@ class InstallmentController extends Controller
      * @return void
      */
     public function __construct(
+        protected CommissionRateController $commission,
         protected Halkode $halkode
     ) {
         //
@@ -40,24 +41,57 @@ class InstallmentController extends Controller
     /**
      * Installment payment information.
      */
-    public function index(Request $request)
+    public function index(Request $request): array
     {
         $token = $this->getToken();
+
+        $commissionRates = $this->commission->index();
 
         $response = Http::timeout(20)
             ->withToken($token)
             ->acceptJson()
             ->post($this->halkode->getPaymentUrl() . '/api/getpos', [
-                'credit_card'   => $request->credit_card,
-                'amount'        => (float) $request->amount,
-                'currency_code' => 'TRY',
                 'merchant_key'  => $this->halkode->getMerchantKey(),
+                'credit_card'   => $request->credit_card,
+                'amount'        => $request->amount,
+                'currency_code' => 'TRY',
             ]);
 
-        if ($response->failed()) {
-            throw new \Exception('error: ' . $response->body());
+        $installments = [];
+
+        foreach ($response['data'] as $item) {
+            $num = (int) $item['installments_number'];
+
+            $program = strtolower(trim($item['card_program'] ?? 'default'));
+
+            $rate =
+                $commissionRates[$num][$program]
+                ?? $commissionRates[$num]['default']
+                ?? 0;
+
+            if ($num === 1) {
+                $gross = $request->amount;
+                $net = round($gross * (1 - $rate), 2);
+                $net = round($gross * (1 - $rate), 2);
+            } else {
+                $gross = round($request->amount / (1 - $rate), 2);
+                $net = round($gross * (1 - $rate), 2);
+            }
+
+            $installments[] = [
+                'installments_number' => $num,
+                'amount'             => number_format($gross, 2, '.', ''),
+                'monthly_amount'     => number_format($gross / $num, 2, '.', ''),
+                'merchant_net'       => number_format($net, 2, '.', ''),
+                'commission_amount'  => number_format($gross - $net, 2, '.', ''),
+                'commission_rate'    => number_format($rate * 100, 2) . '%',
+                'currency'           => $item['currency_code'],
+                'card_program'       => $program,
+            ];
         }
 
-        return $response->json();
+        usort($installments, fn ($a, $b) => $a['installments_number'] <=> $b['installments_number']);
+
+        return $installments;
     }
 }

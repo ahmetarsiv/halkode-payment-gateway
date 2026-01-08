@@ -7,54 +7,55 @@
     <script>
         const installmentMap = {};
 
-        async function updateInstallments() {
+        function updateInstallments() {
             const ccNo = document.getElementById('cc_no').value;
             const total = document.getElementById('total')?.value || "{{ $total }}";
+            const currencyCode = "{{ core()->getCurrentCurrencyCode() }}"
 
             if (ccNo.length !== 16 || !total) return;
 
-            try {
-                const res = await fetch("{{ route('halkode.installments') }}", {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    body: JSON.stringify({credit_card: ccNo, amount: total})
+            fetch("{{ route('halkode.installments') }}", {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({ credit_card: ccNo, amount: total })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (!Array.isArray(data)) throw new Error('Geçersiz veri formatı');
+
+                    const select = document.getElementById('installments_number');
+                    select.innerHTML = '';
+
+                    data.forEach(item => {
+                        installmentMap[item.installments_number] = parseFloat(item.amount);
+
+                        const option = document.createElement('option');
+                        option.value = item.installments_number;
+                        option.text = parseInt(item.installments_number) === 1
+                            ? `Tek Çekim - ${item.amount} ${currencyCode}`
+                            : `${item.installments_number} Taksit x ${item.monthly_amount} ${currencyCode}`;
+
+                        select.appendChild(option);
+                    });
+
+                    updatePayButton();
+                })
+                .catch(error => {
+                    console.error('Taksit bilgisi alınamadı:', error);
+                    alert('Taksit bilgisi alınamadı. Lütfen tekrar deneyin.');
                 });
-
-                const {data} = await res.json();
-                if (!Array.isArray(data)) return;
-
-                const select = document.getElementById('installments_number');
-
-                for (const key in installmentMap) delete installmentMap[key];
-
-                select.innerHTML = data.map(({installments_number: num, amount_to_be_paid: amt, currency_code: cur}) => {
-                    const total = parseFloat(amt);
-                    installmentMap[num] = total;
-
-                    const text = num === 1
-                        ? `Tek Çekim - ${total.toFixed(2)} ${cur}`
-                        : `${num} Taksit - Aylık: ${(total / num).toFixed(2)} ${cur}`;
-
-                    return `<option value="${num}">${text}</option>`;
-                }).join('');
-
-                updatePayButton();
-            } catch (err) {
-                console.error('Hata:', err);
-                alert('Bir hata oluştu.');
-            }
         }
 
         function updatePayButton() {
-            const num = document.getElementById('installments_number').value;
-            const total = installmentMap[num];
-            const btn = document.getElementById('pay-button');
+            const select = document.getElementById('installments_number');
+            const button = document.getElementById('pay-button');
+            const totalAmount = installmentMap[select?.value];
 
-            if (total && btn) {
-                btn.innerText = `@lang('halkode::app.resources.actions.pay') ${total.toFixed(2)} {{ core()->getCurrentCurrencyCode() }}`;
+            if (button && totalAmount) {
+                button.innerText = `@lang('halkode::app.resources.actions.pay') ${totalAmount.toFixed(2)} {{ core()->getCurrentCurrencyCode() }}`;
             }
         }
 
@@ -210,7 +211,7 @@
                     id="pay-button"
                     type="submit"
                     class="secondary-button w-full max-w-full max-md:py-3 max-sm:rounded-lg max-sm:py-1.5"
-                    :title="__('halkode::app.resources.actions.pay') . ' ' . number_format($total, 2) . ' ' . core()->getCurrentCurrencyCode()"
+                    :title="__('halkode::app.resources.actions.pay') . ' ' . $total . ' ' . core()->getCurrentCurrencyCode()"
                 />
             </x-shop::form>
 
