@@ -44,40 +44,28 @@ class PaymentController extends Controller
      */
     public function callback(Request $request)
     {
-        $cart = Cart::getCart();
-        $grandTotal = round($cart->grand_total, 2);
-        $runningTotal = 0;
-        $items = [];
+        $cart = Cart::collectTotals()->getCart();
+        $invoiceId = uniqid('HALKODE_');
 
-        foreach ($cart->items as $p) {
-            $unitPrice = round(($p->total_incl_tax - $p->discount_amount) / $p->quantity, 2);
-            $runningTotal += ($unitPrice * $p->quantity);
+        $items = $cart->items->map(fn($p) => [
+            'name'        => $p->name,
+            'price'       => round(($p->total_incl_tax - $p->discount_amount) / $p->quantity, 4),
+            'quantity'    => $p->quantity,
+            'description' => $p->getTypeInstance()->isStockable() ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
+        ])->toArray();
 
-            $items[] = [
-                'name'        => $p->name,
-                'price'       => number_format($unitPrice, 2, '.', ''),
-                'quantity'    => $p->quantity,
-                'description' => $p->getTypeInstance()->isStockable() ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
-            ];
+        if (empty($items)) {
+            return redirect()->route('halkode.cancel');
         }
 
-        if (($shipping = round($cart->shipping_amount_incl_tax, 2)) > 0) {
-            $runningTotal += $shipping;
+        if ($cart->shipping_amount_incl_tax > 0) {
             $items[] = [
                 'name'        => 'Shipping',
-                'price'       => number_format($shipping, 2, '.', ''),
+                'price'       => round($cart->shipping_amount_incl_tax, 4),
                 'quantity'    => 1,
-                'description' => 'SERVICE'
+                'description' => 'SERVICE',
             ];
         }
-
-        if (($diff = round($grandTotal - $runningTotal, 2)) && $items) {
-            $last = array_key_last($items);
-            $items[$last]['price'] = number_format($items[$last]['price'] + $diff, 2, '.', '');
-        }
-
-        $invoiceId = uniqid('HALKODE_');
-        $formattedTotal = number_format($grandTotal, 2, '.', '');
 
         $payload = [
             "cc_holder_name"      => $request->cc_holder_name,
@@ -88,13 +76,13 @@ class PaymentController extends Controller
             "currency_code"       => "TRY",
             "installments_number" => $request->installments_number,
             "invoice_id"          => $invoiceId,
-            "invoice_description" => "Grand total:" . $formattedTotal,
-            "total"               => $formattedTotal,
+            "invoice_description" => "Grand total:" . $cart->grand_total,
+            "total"               => number_format($cart->grand_total, 4, '.', ''),
             "items"               => json_encode($items),
             "name"                => $cart['customer_first_name'],
             "surname"             => $cart['customer_last_name'],
             "merchant_key"        => $this->halkode->getMerchantKey(),
-            "hash_key"            => $this->generateHash($formattedTotal, $request->installments_number, 'TRY', $this->halkode->getMerchantKey(), $invoiceId, $this->halkode->getAppSecret()),
+            "hash_key"            => $this->generateHash(number_format($cart->grand_total, 4, '.', ''), $request->installments_number, 'TRY', $this->halkode->getMerchantKey(), $invoiceId, $this->halkode->getAppSecret()),
             "return_url"          => route('halkode.success'),
             "cancel_url"          => route('halkode.cancel'),
         ];
