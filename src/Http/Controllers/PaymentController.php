@@ -49,8 +49,8 @@ class PaymentController extends Controller
 
         $items = $cart->items->map(fn($p) => [
             'name'        => $p->name,
-            'price'       => round(($p->total_incl_tax - $p->discount_amount) / $p->quantity, 4),
-            'quantity'    => $p->quantity,
+            'price'       => round($p->total_incl_tax - $p->discount_amount, 2),
+            'quantity'    => 1,
             'description' => $p->getTypeInstance()->isStockable() ? 'PHYSICAL_GOODS' : 'DIGITAL_GOODS',
         ])->toArray();
 
@@ -61,7 +61,7 @@ class PaymentController extends Controller
         if ($cart->shipping_amount_incl_tax > 0) {
             $items[] = [
                 'name'        => 'Shipping',
-                'price'       => round($cart->shipping_amount_incl_tax, 4),
+                'price'       => round($cart->shipping_amount_incl_tax, 2),
                 'quantity'    => 1,
                 'description' => 'SERVICE',
             ];
@@ -77,12 +77,12 @@ class PaymentController extends Controller
             "installments_number" => $request->installments_number,
             "invoice_id"          => $invoiceId,
             "invoice_description" => "Grand total:" . $cart->grand_total,
-            "total"               => number_format($cart->grand_total, 4, '.', ''),
+            "total"               => number_format($cart->grand_total, 2, '.', ''),
             "items"               => json_encode($items),
             "name"                => $cart['customer_first_name'],
             "surname"             => $cart['customer_last_name'],
             "merchant_key"        => $this->halkode->getMerchantKey(),
-            "hash_key"            => $this->generateHash(number_format($cart->grand_total, 4, '.', ''), $request->installments_number, 'TRY', $this->halkode->getMerchantKey(), $invoiceId, $this->halkode->getAppSecret()),
+            "hash_key"            => $this->generateHash(number_format($cart->grand_total, 2, '.', ''), $request->installments_number, 'TRY', $this->halkode->getMerchantKey(), $invoiceId, $this->halkode->getAppSecret()),
             "return_url"          => route('halkode.success'),
             "cancel_url"          => route('halkode.cancel'),
         ];
